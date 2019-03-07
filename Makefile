@@ -96,7 +96,11 @@ stamps/pi-xfer: clean
 stamps/pi-build: stamps/pi-xfer
 	ssh $(REMOTE) 'make clean --directory=$(REMOTEDIR)'
 	ssh $(REMOTE) 'make --directory=$(REMOTEDIR)'
-	scp $(REMOTE):$(REMOTEDIR)/$(LIB_DEST)/lib$(SONAME).so $(LOCALINCLUDE)
+	mkdir -p lib
+	scp $(REMOTE):$(REMOTEDIR)/$(LIB_DEST)/lib$(SONAME).so $(LIB_DEST)/lib$(SONAME).so
+	scp $(REMOTE):$(REMOTEDIR)/$(LIB_DEST)/lib$(SONAME).so $(LOCALINCLUDE)/lib$(SONAME).so
+	ssh $(REMOTE) 'jar cvf libsocket.jar -C $(REMOTEDIR)/bin .'
+	scp $(REMOTE):$(REMOTEDIR)/libsocket.jar $(LOCALINCLUDE)/libsocket.jar
 
 .PHONY: check
 check: stamps/create-jar stamps/compile-test

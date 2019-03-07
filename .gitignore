@@ -34,3 +34,7 @@
 # JNI stuff:
 *.class
 *.so
+/.DS_Store
+/target/
+/bin/
+/bintest/
