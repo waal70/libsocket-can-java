@@ -40,7 +40,7 @@ CXXFLAGS=-I./include -O2 -g -pipe -Wall -Wp,-D_FORTIFY_SOURCE=2 -fexceptions \
 $(JAVA_INCLUDES)
 SONAME=jni_socketcan
 LDFLAGS=-Wl,-soname,$(SONAME)
-REMOTE=169.254.23.187
+REMOTE=192.168.29.250#169.254.23.187
 REMOTEDIR=/home/awaal/libsocket-can-java
 LOCALINCLUDE=../VolvoCANBUS/src/main/resources/lib
 
@@ -85,8 +85,11 @@ stamps/create-jar: stamps/compile-jni $(JAR_MANIFEST_FILE)
 	@touch $@
 	
 stamps/pi-xfer: clean
-	##Pre-req: make sure the local key-pair is also
-	##allowed on the pi:
+	## This target transfers the source files to the remote
+	## After this, it is possible to do a remote make via
+	## the target pi-build
+	## Pre-req: make sure the local key-pair is also
+	## allowed on the pi:
 	## on local machine (in ~/.ssh): ssh-keygen -t rsa
 	## cat id_rsa.pub | ssh <user>@$(REMOTE) ' cat >>.ssh/authorized_keys'
 	## ssh-keyscan $(REMOTE) >> ~/.ssh/known_hosts
@@ -96,10 +99,20 @@ stamps/pi-xfer: clean
 stamps/pi-build: stamps/pi-xfer
 	ssh $(REMOTE) 'make clean --directory=$(REMOTEDIR)'
 	ssh $(REMOTE) 'make --directory=$(REMOTEDIR)'
+
+stamps/pi2local-xfer: stamps/pi-build
+	## This target takes the native library (.so) and the
+	## JAVA classes (creates a jar) and transfers them
+	## to the local filesystem
+	## Prepare a local folder:
 	mkdir -p lib
+	## Transfer the native library to the local project:
 	scp $(REMOTE):$(REMOTEDIR)/$(LIB_DEST)/lib$(SONAME).so $(LIB_DEST)/lib$(SONAME).so
+	## Transfer the native library to the local JAVA project that uses it:
 	scp $(REMOTE):$(REMOTEDIR)/$(LIB_DEST)/lib$(SONAME).so $(LOCALINCLUDE)/lib$(SONAME).so
+	## Create a (non-executable) jar file from all compiled JAVA source:
 	ssh $(REMOTE) 'jar cvf libsocket.jar -C $(REMOTEDIR)/bin .'
+	## Transfer the jar file to the local JAVA project that uses it:
 	scp $(REMOTE):$(REMOTEDIR)/libsocket.jar $(LOCALINCLUDE)/libsocket.jar
 
 .PHONY: check
