@@ -406,6 +406,31 @@ JNIEXPORT jint JNICALL Java_org_waal70_canbus_CanSocket__1clearERR
 	return canid & ~CAN_ERR_FLAG;
 }
 
+JNIEXPORT jobject JNICALL Java_org_waal70_canbus_CanSocket__1getFilters
+(JNIEnv *env, jclass obj, jint sock) {
+    // assign the signed integer max value to an unsigned integer, socketcan's getsockopt implementation uses int's
+    // instead of uint's and resets the size to the actual size only if the given size is larger.
+    socklen_t size = 2147483647; //INT_MAX
+
+    void* filters = malloc(size);
+    if (filters == NULL) {
+        return NULL;
+    }
+
+    int result = getsockopt(sock, SOL_CAN_RAW, CAN_RAW_FILTER, filters, &size);
+    if (result == -1) {
+        return NULL;
+    }
+
+    void* filters_out = malloc(size);
+    if (filters_out == NULL) {
+        return NULL;
+    }
+
+    memcpy(filters_out, filters, size);
+    return env->NewDirectByteBuffer(filters_out, size);
+}
+
 JNIEXPORT jint JNICALL Java_org_waal70_canbus_CanSocket__1setFilters
 (JNIEnv *env, jclass obj, jint sock, jobject data) {
     void* rawData = env->GetDirectBufferAddress(data);
