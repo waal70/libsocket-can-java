@@ -109,13 +109,14 @@ stamps/pi2local-xfer: stamps/pi-build
         ## Transfer the native library to the local project:
 		scp $(REMOTE):$(REMOTEDIR)/$(LIB_DEST)/lib$(SONAME).so $(LIB_DEST)/lib$(SONAME).so
         ## Transfer the native library to the local JAVA project that uses it:
+		mkdir -p $(LOCALINCLUDE)
 		scp $(REMOTE):$(REMOTEDIR)/$(LIB_DEST)/lib$(SONAME).so $(LOCALINCLUDE)/lib$(SONAME).so
         ## Create a (non-executable) jar file from all compiled JAVA source:
-		ssh $(REMOTE) 'jar cvf libsocket.jar -C $(REMOTEDIR)/bin .'
+		##ssh $(REMOTE) 'jar cvf libsocket.jar -C $(REMOTEDIR)/bin .'
         ## Copy classes to local JAVA project:
-		scp -r $(REMOTE):$(REMOTEDIR)/bin/org ../VolvoCANBUS/target/classes
+		##scp -r $(REMOTE):$(REMOTEDIR)/bin/org ../VolvoCANBUS/target/classes
         ## Transfer the jar file to the local JAVA project that uses it:
-		scp $(REMOTE):$(REMOTEDIR)/libsocket.jar $(LOCALINCLUDE)/libsocket.jar
+		##scp $(REMOTE):$(REMOTEDIR)/libsocket.jar $(LOCALINCLUDE)/libsocket.jar
 
 .PHONY: check
 check: stamps/create-jar stamps/compile-test
