@@ -137,17 +137,21 @@ public final class CanSocket implements Closeable {
     {
     	ByteBuffer filterData = ByteBuffer.allocateDirect(data.length * CanFilter.BYTES);
     	//ByteBuffer filterData = ByteBuffer.allocateDirect(data.length * 2);
+    	System.out.println("data is: " + data.toString());
     	filterData.order(ByteOrder.nativeOrder());
+    	//filterData.putInt(data[0].getId());
+    	//filterData.putInt(data[0].getMask());
     	for (CanFilter f : data) {
     		//log.debug("f.getId()" + f.getId());
     		//log.debug("f.getMask()" + String.format("0x%08X", f.getMask()));
     		filterData.putInt(f.getId());
     		filterData.putInt(f.getMask());
+    		System.out.println("filterData is: " + filterData.toString());
        		} 
    	
         	if (CanSocket._setFilters(_fd, filterData) == -1)
         		//log.debug("Filter set error");
-        		System.out.println("Filter error");
+        		System.out.println("Filter errors");
     }
     
     public void getFilters() {

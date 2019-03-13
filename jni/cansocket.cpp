@@ -5,6 +5,10 @@
 #include<cstring>
 #include<cstddef>
 #include<cerrno>
+#include<syslog.h>
+
+#include<sstream>
+#include<string.h>
 
 extern "C" {
 #include <sys/types.h>
@@ -194,7 +198,6 @@ JNIEXPORT jobject JNICALL Java_org_waal70_canbus_CanSocket__1recvFrame
 	struct sockaddr_can addr;
 	socklen_t len = sizeof(addr);
 	struct can_frame frame;
-
 	memset(&addr, 0, sizeof(addr));
 	memset(&frame, 0, sizeof(frame));
 	nbytes = recvfrom(fd, &frame, sizeof(frame), flags,
@@ -433,8 +436,31 @@ JNIEXPORT jobject JNICALL Java_org_waal70_canbus_CanSocket__1getFilters
 
 JNIEXPORT jint JNICALL Java_org_waal70_canbus_CanSocket__1setFilters
 (JNIEnv *env, jclass obj, jint sock, jobject data) {
-    void* rawData = env->GetDirectBufferAddress(data);
-    int result = setsockopt(sock, SOL_CAN_RAW, CAN_RAW_FILTER, rawData, (socklen_t) env->GetDirectBufferCapacity(data));
 
+	struct can_filter *rfilter;
+
+	//Expect a filter definition in the following form (HEX!):
+	//"12345678:DFFFFFFF"
+	//TODO: Accept object and or string from JAVA and process here
+
+	//TODO: Accept more than one filter
+
+	rfilter = (can_filter*) malloc(4);
+	if (sscanf("0001E240:DFFFFFFF", "%x:%x",
+						   &rfilter[0].can_id,
+						   &rfilter[0].can_mask) == 2) {
+	 					rfilter[0].can_mask &= ~CAN_ERR_FLAG;
+						rfilter[0].can_id |= CAN_EFF_FLAG;
+	}
+openlog("libsocket-can-java native library: ", LOG_CONS, LOG_USER);
+
+    //void* rawData = env->GetDirectBufferAddress(data);
+	//const int opt = 1;
+	int result = setsockopt(sock, SOL_CAN_RAW, CAN_RAW_FILTER, rfilter, sizeof(struct can_filter));
+    std::stringstream strs;
+     strs << result;
+     std::string temp_str = strs.str();
+     char* char_type = (char*) temp_str.c_str();
+	syslog(LOG_INFO,char_type);
     return result;
 }
