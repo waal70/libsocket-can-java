@@ -127,7 +127,7 @@ public final class CanSocket implements Closeable {
     private static native int _fetch_CAN_RAW_LOOPBACK();
     private static native int _fetch_CAN_RAW_RECV_OWN_MSGS();
     private static native int _fetch_CAN_RAW_FD_FRAMES();
-    private static native int _setFilters(final int fd, ByteBuffer data);
+    private static native int _setFilters(final int fd, String data);
     private static native ByteBuffer _getFilters (final int fd); 
     
     
@@ -135,6 +135,8 @@ public final class CanSocket implements Closeable {
     //public void setFilters(Object[] data)
     
     {
+    	//TODO: accept the array of CanFilters, but pass it to the native
+    	// method as a comma-separated String of filter definitions (canid:canmask)
     	ByteBuffer filterData = ByteBuffer.allocateDirect(data.length * CanFilter.BYTES);
     	//ByteBuffer filterData = ByteBuffer.allocateDirect(data.length * 2);
     	System.out.println("data is: " + data.toString());
@@ -149,7 +151,7 @@ public final class CanSocket implements Closeable {
     		System.out.println("filterData is: " + filterData.toString());
        		} 
    	
-        	if (CanSocket._setFilters(_fd, filterData) == -1)
+        	if (CanSocket._setFilters(_fd, "123456:DFFFFFF") == -1)
         		//log.debug("Filter set error");
         		System.out.println("Filter errors");
     }
