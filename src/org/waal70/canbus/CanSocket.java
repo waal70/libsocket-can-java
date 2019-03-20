@@ -8,7 +8,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -140,10 +139,13 @@ public final class CanSocket implements Closeable {
     	// method as a comma-separated String of filter definitions (canid:canmask)
     	// The native method expects a filter definition in the following form (HEX!):
     	// "12345678:DFFFFFFF"
+    	// First, let's reset the filters:
+    	if (CanSocket._setFilters(_fd, filterString) == -1)
+    		System.out.println("Unable to reset filter");
     	for (CanFilter f : data) {
     		//log.debug("f.getId()" + f.getId());
     		//log.debug("f.getMask()" + String.format("0x%08X", f.getMask()));
-    		filterString += f.getIdHex() + "," + f.getMaskHex();
+    		filterString += f.getIdHex() + ":" + f.getMaskHex();
     		
     		System.out.println("filterData is: " + filterString);
        		} 
@@ -261,7 +263,7 @@ public final class CanSocket implements Closeable {
 
     	public String getCanId_EFFHex() {
 
-    		return String.format("0x%08X", _getCANID_EFF(_canId));
+    		return String.format("%08X", _getCANID_EFF(_canId));
 
     	}
     	public String getCanId_SFF() {
@@ -345,7 +347,7 @@ public final class CanSocket implements Closeable {
         /**
          * This predefined filter accepts any CAN ID.
          */
-        public static final CanFilter ANY = new CanFilter(new CanId(0), 0);
+        public static final CanFilter ANY = new CanFilter(new CanId(0), "0");
 
         /**
          * This predefined filter accepts no CAN ID at all.
@@ -360,10 +362,10 @@ public final class CanSocket implements Closeable {
         /**
          * This filter mask can be used to match a CAN ID exactly.
          */
-        public static final int EXACT = -1;
+        public static final String EXACT = "DFFFFFFF";
 
         private CanId id;
-        private final int mask;
+        private final String mask;
 
         /**
          * Creates a filter to exactly matches the given ID.
@@ -380,7 +382,7 @@ public final class CanSocket implements Closeable {
          * @param id The CAN ID to match
          * @param mask the mask to match
          */
-        public CanFilter(CanId id, int mask) {
+        public CanFilter(CanId id, String mask) {
             this.id = id;
             this.mask = mask;// & ~ERR_FLAG;
         }
@@ -403,12 +405,12 @@ public final class CanSocket implements Closeable {
          *
          * @return the mask
          */
-        public int getMask() {
+        public String getMask() {
             return mask;
         }
         
         public String getMaskHex() {
-        	return String.format("0x%08X", mask);
+        	return mask;
 
         }
 
@@ -438,7 +440,8 @@ public final class CanSocket implements Closeable {
          * @return true if the given CAN ID would be accepted by this filter
          */
         public boolean matchId(int id) {
-            return (this.id.getCanId() & mask) == (id & mask);
+        	long lngMask = Long.getLong(mask);
+            return (this.id.getCanId() & lngMask) == (id & lngMask);
         }
 
         @Override

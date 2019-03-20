@@ -409,6 +409,7 @@ JNIEXPORT jint JNICALL Java_org_waal70_canbus_CanSocket__1setFilters(
 	const char *inFilterString = env->GetStringUTFChars(data, NULL);
 	int numfilter;
 	const char *tempString;
+	const char *tempString2;
 	if (NULL == inFilterString)
 		return -1;
 
@@ -418,6 +419,7 @@ JNIEXPORT jint JNICALL Java_org_waal70_canbus_CanSocket__1setFilters(
 	// as one filter def has one comma.
 	numfilter = 0;
 	tempString = inFilterString;
+	tempString2 = inFilterString;
 	while (tempString) {
 		numfilter++;
 		tempString++; /* hop behind the ',' */
@@ -454,7 +456,7 @@ JNIEXPORT jint JNICALL Java_org_waal70_canbus_CanSocket__1setFilters(
 	int result = setsockopt(sock, SOL_CAN_RAW, CAN_RAW_FILTER, rfilter,
 			sizeof(struct can_filter) * numfilter);
 	std::stringstream strs;
-	strs << result;
+	strs << tempString2;
 	std::string temp_str = strs.str();
 	char* char_type = (char*) temp_str.c_str();
 	syslog(LOG_INFO, char_type);
