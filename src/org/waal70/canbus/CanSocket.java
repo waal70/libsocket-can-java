@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -78,6 +79,17 @@ public final class CanSocket implements Closeable {
             Files.delete(tempSo);
         }
     }
+	private final static char[] hexArray = "0123456789ABCDEF".toCharArray();
+	
+	public static String bytesToHex(byte[] bytes) {
+	    char[] hexChars = new char[bytes.length * 2];
+	    for ( int j = 0; j < bytes.length; j++ ) {
+	        int v = bytes[j] & 0xFF;
+	        hexChars[j * 2] = hexArray[v >>> 4];
+	        hexChars[j * 2 + 1] = hexArray[v & 0x0F];
+	    }
+	    return new String(hexChars);
+	}
 
     public static final CanInterface CAN_ALL_INTERFACES = new CanInterface(0);
     
@@ -127,9 +139,24 @@ public final class CanSocket implements Closeable {
     private static native int _fetch_CAN_RAW_RECV_OWN_MSGS();
     private static native int _fetch_CAN_RAW_FD_FRAMES();
     private static native int _setFilters(final int fd, String data);
-    private static native ByteBuffer _getFilters (final int fd); 
+    private static native byte[] _getFilters (final int fd); 
     
     
+    /**
+     * @param data contains one filter object. Convenience method
+     * to deal with situations where exactly one filter is needed.
+     */
+    public void setFilters(CanFilter data)
+    {
+    	CanFilter[] filterArray = {data};
+    	setFilters(filterArray);
+    	
+    }
+    
+    /**
+     * @param data contains an array of CanFilter objects. The method will
+     * loop through all of them and set the appropriate filter on the CanBus socket.
+     */
     public void setFilters(CanFilter[] data)
     //public void setFilters(Object[] data)
     
@@ -156,11 +183,45 @@ public final class CanSocket implements Closeable {
     }
     
     public void getFilters() {
-    	ByteBuffer filterData = CanSocket._getFilters(_fd);
-    	if (filterData != null)
-    	{//log.debug("Getting FILTER: " + filterData.toString());
-    	filterData.rewind();}
-       }
+    	byte[] filterData = CanSocket._getFilters(_fd);
+    	System.out.println("getting filters...");
+    	
+    	System.out.println("length: " + filterData.length);
+    	//According to struct can_filter, I have 4 bytes can_id and 4 bytes mask:
+    	byte[] canid = new byte[4];
+    	byte[] mask = new byte[4];
+    	//{1,2,3,4,5,6,7,8}
+    	// mask has: can_mask && !CAN_ERR_FLAG;
+    	// canid has can_id = can_id OR CAN_EFF_FLAG;
+		
+    	//byte[] CAN_EFF_MASK = (byte[]) 0b11111111111111111111111111111;
+    	
+    	ByteBuffer id = ByteBuffer.wrap(filterData);
+    	id.order(ByteOrder.BIG_ENDIAN);
+    	canid = Arrays.copyOfRange(filterData, 0, 4);
+    	
+    	ByteBuffer temp = ByteBuffer.wrap(canid);
+    	System.out.println(temp.getInt());
+    	
+    	int CAN_EFF_MASK = 0b11111111111111111111111111111;
+    	
+    	int cid = id.getInt();
+    	cid &= CAN_EFF_MASK;
+    	int maski = id.getInt();
+    	//maski &= ~CAN_EFF_MASK;
+    	System.out.println("canid : " + cid);
+    	System.out.println("mask : " + maski);
+    	//canid =& CAN_EFF_MASK;
+    	mask = Arrays.copyOfRange(filterData, 4, 8);
+    	
+    	
+    	
+    	System.out.println("canid is: " + CanSocket.bytesToHex(canid));
+    	System.out.println("mask is: " + CanSocket.bytesToHex(mask));
+    	
+    	
+    
+    }
     
     private static final int CAN_RAW_FILTER = _fetch_CAN_RAW_FILTER();
     /**
@@ -180,6 +241,10 @@ public final class CanSocket implements Closeable {
     private static native int _getsockopt(final int fd, final int op)
 	    throws IOException;
     
+    /**
+     * @author awaal
+     *
+     */
     public final static class CanId implements Cloneable {
         private int _canId = 0;
         
@@ -187,8 +252,34 @@ public final class CanSocket implements Closeable {
             ERR, EFFSFF, RTR
         }
         
-        public CanId(final int address) {
-            _canId = address;
+        /**
+         * @param intAddress
+         * should be an integer representation of
+         * the can-id. If you have a hex representation, 
+         * prefix it with 0x to have the JVM perform the
+         * cast to int, if you insist on using a string representation,
+         * you can also use the overloaded constructor
+         */
+        public CanId(final int intAddress) {
+            _canId = intAddress;
+        }
+        
+        /**
+         * @param strAddress
+         * can be a HEX string for the can-id.
+         * If you have an int (or a 0x prefixed int),
+         * please use the overloaded constructor 
+         */
+        public CanId(final String strAddress) {
+        	try {
+        		_canId = Integer.parseInt(strAddress);
+        	}
+        	catch (NumberFormatException e)
+        	{
+        		//cannot parse the address, not a proper hex representation?
+        		System.out.println("CanId - constructor: Unable to parse " + strAddress + " to a int. Is it HEX?");
+        		_canId = 0;
+        	}
         }
         
         public boolean isSetEFFSFF() {
@@ -232,11 +323,11 @@ public final class CanSocket implements Closeable {
             _canId = _clearERR(_canId);
             return this;
         }
-        
- /*        public int getCanId_SFF() {
-            return _getCANID_SFF(_canId);
-        } */
-        
+                
+        /**
+         * @return the int representation of the can-id. 
+         * Use getCanIdHEX to get the HEX representation
+         */
         public int getCanId() {
             return _getCANID_EFF(_canId);
         }
@@ -245,28 +336,12 @@ public final class CanSocket implements Closeable {
             return _getCANID_ERR(_canId);
         }
         
-        //Andre added:
+        /**
+         * @return
+         * This method returns the can-id in HEX representation,
+         * without the leading 0x
+         */
         public String getCanId_SFFHex() {
-    		//return the "small" can-id:
-    		//Do not touch the member variable
-    		int canId = _getCANID_SFF(_canId); //& CAN_SFF_MASK;
-    		//log.debug("canId " + canId);
-    		if (canId > 2047) 
-    		{
-    			//log.warn("CanId too big for Standard CANID. Returning max (0x7FF)");
-    			canId = 0x7FF;
-    		}
-    		//_canId&=CAN_SFF_MASK;
-    		return String.format("0x%03X", canId);
-    		//return padToLength(Integer.toString(canId), SFF_LENGTH);
-    	}
-
-    	public String getCanId_EFFHex() {
-
-    		return String.format("%08X", _getCANID_EFF(_canId));
-
-    	}
-    	public String getCanId_SFF() {
     		//return the "small" can-id:
     		//Do not touch the member variable
     		int canId = _getCANID_SFF(_canId); //& CAN_SFF_MASK;
@@ -281,13 +356,34 @@ public final class CanSocket implements Closeable {
     		//return padToLength(Integer.toString(canId), SFF_LENGTH);
     	}
 
-    	public String getCanId_EFF() {
+    	/**
+    	 * @return
+    	 * This method returns the can-id in HEX representation,
+         * without the leading 0x
+    	 */
+    	public String getCanId_EFFHex() {
 
     		return String.format("%08X", _getCANID_EFF(_canId));
 
     	}
+    	public int getCanId_SFF() {
+    		//return the "small" can-id:
+    		//Do not touch the member variable
+    		int canId = _getCANID_SFF(_canId); //& CAN_SFF_MASK;
+    		//log.debug("canId " + canId);
+    		if (canId > 2047) 
+    		{
+    			//log.warn("CanId too big for Standard CANID. Returning max (0x7FF)");
+    			canId = 0x7FF;
+    		}
+    		return canId;
+    	}
 
-        
+    	public int getCanId_EFF() {
+
+    		return _getCANID_EFF(_canId);
+    	}
+      
         @Override
         protected Object clone() {
             return new CanId(_canId);
@@ -336,7 +432,13 @@ public final class CanSocket implements Closeable {
             return true;
         }
     }
-     public static final class CanFilter {
+     /**
+     * @author awaal
+     * This class prepares a read filter for the canbus.
+     * It takes a CanId to represent the can-id, and a
+     * filter mask (4 bytes) to represent the filter.
+     */
+    public static final class CanFilter {
 
         /**
          * This bit inverts the filter.
@@ -347,7 +449,7 @@ public final class CanSocket implements Closeable {
         /**
          * This predefined filter accepts any CAN ID.
          */
-        public static final CanFilter ANY = new CanFilter(new CanId(0), "0");
+        public static final CanFilter ANY = new CanFilter(new CanId(0), 0);
 
         /**
          * This predefined filter accepts no CAN ID at all.
@@ -355,17 +457,14 @@ public final class CanSocket implements Closeable {
         public static final CanFilter NONE = new CanFilter(new CanId(0));
 
         /**
-         * The size of the native representation of a {@link tel.schich.javacan.CanFilter}.
-         */
-        public static final int BYTES = Integer.BYTES * 2;
-
-        /**
          * This filter mask can be used to match a CAN ID exactly.
          */
-        public static final String EXACT = "DFFFFFFF";
+        public static final int EXACT = 0xDFFFFFFF;
+        public static final int ALL = 0x0;
 
         private CanId id;
-        private final String mask;
+        private int mask;
+        //private final String mask;
 
         /**
          * Creates a filter to exactly matches the given ID.
@@ -380,12 +479,34 @@ public final class CanSocket implements Closeable {
          * Creates a filter with the given CAN ID and mask.
          *
          * @param id The CAN ID to match
-         * @param mask the mask to match
+         * @param lngMask the mask to match
          */
-        public CanFilter(CanId id, String mask) {
+        public CanFilter(CanId id, int intMask) {
             this.id = id;
-            this.mask = mask;// & ~ERR_FLAG;
+            this.mask = intMask;
         }
+        
+        /**
+         * Creates a filter with the given CAN ID and mask.
+         * Overloaded to support feeding it a String
+         * Should the conversion fail, the mask will pass ALL
+         *
+         * @param id The CAN ID to match
+         * @param strMask the mask to match
+         */
+        public CanFilter(CanId id, String strMask) {
+            this.id = id;
+            try {
+            	this.mask = Integer.parseInt(strMask);
+            }
+            catch (NumberFormatException e)
+            {
+            	System.out.println("Cannot parse " + strMask + " to int. Is it a HEX representation?");
+            	this.mask = ALL;
+            }
+        }
+        
+        
 
         /**
          * Gets the CAN ID to be matched by this filter.
@@ -405,15 +526,14 @@ public final class CanSocket implements Closeable {
          *
          * @return the mask
          */
-        public String getMask() {
-            return mask;
+        public String getMaskHex() {
+            return String.format("%08X", mask);
         }
         
-        public String getMaskHex() {
+        public long getMask() {
         	return mask;
-
         }
-
+  
         /**
          * Checks if this filter is inverted.
          *
@@ -440,8 +560,8 @@ public final class CanSocket implements Closeable {
          * @return true if the given CAN ID would be accepted by this filter
          */
         public boolean matchId(int id) {
-        	long lngMask = Long.getLong(mask);
-            return (this.id.getCanId() & lngMask) == (id & lngMask);
+
+            return (this.id.getCanId() & mask) == (id & mask);
         }
 
         @Override

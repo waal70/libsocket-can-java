@@ -377,29 +377,47 @@ JNIEXPORT jint JNICALL Java_org_waal70_canbus_CanSocket__1clearERR(JNIEnv *env,
 	return canid & ~CAN_ERR_FLAG;
 }
 
-JNIEXPORT jobject JNICALL Java_org_waal70_canbus_CanSocket__1getFilters(
+JNIEXPORT jbyteArray JNICALL Java_org_waal70_canbus_CanSocket__1getFilters(
 		JNIEnv *env, jclass obj, jint sock) {
 	// assign the signed integer max value to an unsigned integer, socketcan's getsockopt implementation uses int's
 	// instead of uint's and resets the size to the actual size only if the given size is larger.
-	socklen_t size = 2147483647; //INT_MAX
+	struct can_filter *rfilter;
+	struct can_filter *filters_out;
+	//socklen_t size;
+	size_t size;
 
-	void* filters = malloc(size);
-	if (filters == NULL) {
-		return NULL;
-	}
+	// For now, maximize the limit to 5 filters...
+	size = (size_t) sizeof(struct can_filter) * 5;
+	openlog("libsocket-can-java native library: ", LOG_CONS, LOG_USER);
 
-	int result = getsockopt(sock, SOL_CAN_RAW, CAN_RAW_FILTER, filters, &size);
+	int result = getsockopt(sock, SOL_CAN_RAW, CAN_RAW_FILTER, (char *) &rfilter, &size);
 	if (result == -1) {
 		return NULL;
 	}
+	filters_out = rfilter;
 
-	void* filters_out = malloc(size);
-	if (filters_out == NULL) {
-		return NULL;
-	}
 
-	memcpy(filters_out, filters, size);
-	return env->NewDirectByteBuffer(filters_out, size);
+
+	jbyteArray data = env->NewByteArray(size);
+
+		if (data == NULL) {
+				if (env->ExceptionCheck() != JNI_TRUE) {
+					throwOutOfMemoryError(env, "could not allocate ByteArray");
+				}
+				return NULL;
+			}
+
+	env->SetByteArrayRegion(data, 0, size,
+					reinterpret_cast<jbyte *>(&filters_out));
+
+	//delete[] filters_out;
+	std::stringstream strs;
+	strs << "About to return from getsockopt";
+	std::string temp_str = strs.str();
+	char* char_type = (char*) temp_str.c_str();
+	syslog(LOG_INFO, char_type);
+
+	return data;
 }
 
 JNIEXPORT jint JNICALL Java_org_waal70_canbus_CanSocket__1setFilters(

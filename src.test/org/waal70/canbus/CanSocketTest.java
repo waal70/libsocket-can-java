@@ -96,7 +96,7 @@ public class CanSocketTest {
         id_0.clearERR();
         assert !id_0.isSetERR();
         
-        assert id_0.getCanId_EFF() == "0x0";
+        assert id_0.getCanId_EFF() == 0x0;
     }
     
     @Test
