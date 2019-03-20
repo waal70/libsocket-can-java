@@ -406,7 +406,7 @@ JNIEXPORT jint JNICALL Java_org_waal70_canbus_CanSocket__1setFilters(
 		JNIEnv *env, jclass obj, jint sock, jstring data) {
 
 	// First, let's convert the jstring to a proper C++-string:
-	const char *inFilterString = *env->GetStringUTFChars(data, NULL);
+	const char *inFilterString = env->GetStringUTFChars(data, NULL);
 	int numfilter;
 	const char *tempString;
 	if (NULL == inFilterString)
@@ -423,7 +423,10 @@ JNIEXPORT jint JNICALL Java_org_waal70_canbus_CanSocket__1setFilters(
 		tempString++; /* hop behind the ',' */
 		tempString = strchr(tempString, ','); /* fails if no more commas are found */
 	}
-	//Now, numfilter contains the number of filters :)
+	//Now, numfilter contains the number of filters :) Should that be 0, then do an erase
+	// of the filters:
+	if (numfilter == 0)
+		return setsockopt(sock, SOL_CAN_RAW, CAN_RAW_FILTER, NULL, 0);
 
 	//Expect a filter definition in the following form (HEX!):
 	//"12345678:DFFFFFFF"

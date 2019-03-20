@@ -135,23 +135,20 @@ public final class CanSocket implements Closeable {
     //public void setFilters(Object[] data)
     
     {
+    	String filterString = ""; //set the default to accept everything
     	//TODO: accept the array of CanFilters, but pass it to the native
     	// method as a comma-separated String of filter definitions (canid:canmask)
-    	ByteBuffer filterData = ByteBuffer.allocateDirect(data.length * CanFilter.BYTES);
-    	//ByteBuffer filterData = ByteBuffer.allocateDirect(data.length * 2);
-    	System.out.println("data is: " + data.toString());
-    	filterData.order(ByteOrder.nativeOrder());
-    	//filterData.putInt(data[0].getId());
-    	//filterData.putInt(data[0].getMask());
+    	// The native method expects a filter definition in the following form (HEX!):
+    	// "12345678:DFFFFFFF"
     	for (CanFilter f : data) {
     		//log.debug("f.getId()" + f.getId());
     		//log.debug("f.getMask()" + String.format("0x%08X", f.getMask()));
-    		filterData.putInt(f.getId());
-    		filterData.putInt(f.getMask());
-    		System.out.println("filterData is: " + filterData.toString());
+    		filterString += f.getIdHex() + "," + f.getMaskHex();
+    		
+    		System.out.println("filterData is: " + filterString);
        		} 
    	
-        	if (CanSocket._setFilters(_fd, "123456:DFFFFFF") == -1)
+        	if (CanSocket._setFilters(_fd, filterString) == -1)
         		//log.debug("Filter set error");
         		System.out.println("Filter errors");
     }
@@ -396,6 +393,10 @@ public final class CanSocket implements Closeable {
         public int getId() {
             return id.getCanId();
         }
+        
+        public String getIdHex() {
+        	return id.getCanId_EFFHex();
+        }
 
         /**
          * Gets the mask to used to match the CAN ID.
@@ -404,6 +405,11 @@ public final class CanSocket implements Closeable {
          */
         public int getMask() {
             return mask;
+        }
+        
+        public String getMaskHex() {
+        	return String.format("0x%08X", mask);
+
         }
 
         /**
