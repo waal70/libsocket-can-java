@@ -18,6 +18,7 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
@@ -167,12 +168,18 @@ public final class CanSocket implements Closeable {
     	// The native method expects a filter definition in the following form (HEX!):
     	// "12345678:DFFFFFFF"
     	// First, let's reset the filters:
+    	int numfilter = 0;
+    	int filtercounter = data.length -1;
     	if (CanSocket._setFilters(_fd, filterString) == -1)
     		System.out.println("Unable to reset filter");
     	for (CanFilter f : data) {
     		//log.debug("f.getId()" + f.getId());
     		//log.debug("f.getMask()" + String.format("0x%08X", f.getMask()));
     		filterString += f.getIdHex() + ":" + f.getMaskHex();
+    		if (numfilter < filtercounter)
+    			filterString +=",";
+    		numfilter++;
+    		
     		
     		System.out.println("filterData is: " + filterString);
        		} 
@@ -182,37 +189,53 @@ public final class CanSocket implements Closeable {
         		System.out.println("Filter errors");
     }
     
+    static int bitExtract(int number, int k, int p) 
+    { 
+        return (((1 << k) - 1) & (number >> (p - 1))); 
+    } 
+    
+    static byte[] reverseBytes (byte[] inArray) {
+    	for (int left = 0, right = inArray.length - 1; left < right; ++left, --right) {
+    	    byte temp = inArray[left]; 
+    	    inArray[left]  = inArray[right]; 
+    	    inArray[right] = temp;
+    	}
+    	return inArray;
+    }
+    
     public void getFilters() {
+    	int FILTER_SIZE = 8;
+    	int numFilter = 0;
     	byte[] filterData = CanSocket._getFilters(_fd);
-    	System.out.println("getting filters...");
     	
-    	System.out.println("length: " + filterData.length);
-    	//According to struct can_filter, I have 4 bytes can_id and 4 bytes mask:
-    	byte[] canid = new byte[4];
-    	byte[] mask = new byte[4];
-    	//{1,2,3,4,5,6,7,8}
-    	// mask has: can_mask && !CAN_ERR_FLAG;
-    	// canid has can_id = can_id OR CAN_EFF_FLAG;
-		
-    	//byte[] CAN_EFF_MASK = (byte[]) 0b11111111111111111111111111111;
+    	if (filterData != null)
+    		numFilter = filterData.length / FILTER_SIZE;
     	
-    	ByteBuffer id = ByteBuffer.wrap(filterData);
-    	id.order(ByteOrder.BIG_ENDIAN);
-    	canid = Arrays.copyOfRange(filterData, 0, 4);
     	
-    	ByteBuffer temp = ByteBuffer.wrap(canid);
-    	System.out.println(temp.getInt());
+    	System.out.println("I have found " + numFilter + " filter(s).");
+    	System.out.println("Full filter in HEX: " + CanSocket.bytesToHex(filterData));
     	
-    	int CAN_EFF_MASK = 0b11111111111111111111111111111;
-    	
-    	int cid = id.getInt();
-    	cid &= CAN_EFF_MASK;
-    	int maski = id.getInt();
-    	//maski &= ~CAN_EFF_MASK;
-    	System.out.println("canid : " + cid);
-    	System.out.println("mask : " + maski);
-    	//canid =& CAN_EFF_MASK;
-    	mask = Arrays.copyOfRange(filterData, 4, 8);
+    	byte[] canid = reverseBytes(Arrays.copyOfRange(filterData, 0, 4));
+    	byte[] mask = Arrays.copyOfRange(filterData, 4, 8);
+      	
+      	ByteBuffer bb = ByteBuffer.wrap(canid);
+      	int cannumber = bb.getInt();
+      	int CAN_EFF_MASK = 0b11111111111111111111111111111; //29 bits
+      	int CAN_MASK = 0b11011111111111111111111111111111;
+      	int can2 = cannumber & CAN_EFF_MASK;
+      	
+      	ByteBuffer bbm = ByteBuffer.wrap(mask);
+      	int intMask = bbm.getInt();
+      	intMask = ~intMask;
+      	long unsignedMask = intMask;
+      	unsignedMask = unsignedMask & 0xffffffff;
+      	//unsignedMask = ~unsignedMask;
+      	
+      	cannumber = CanSocket.bitExtract(cannumber, 29, 1);
+      	System.out.println("The 29 can2 bits are: " + can2);
+    	System.out.println("The 29 bits are: " + cannumber);
+    	System.out.println("The mask is: " + unsignedMask);
+
     	
     	
     	
@@ -459,7 +482,7 @@ public final class CanSocket implements Closeable {
         /**
          * This filter mask can be used to match a CAN ID exactly.
          */
-        public static final int EXACT = 0xDFFFFFFF;
+        public static final int EXACT = 0xAFFAFFFF;
         public static final int ALL = 0x0;
 
         private CanId id;

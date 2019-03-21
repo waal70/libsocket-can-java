@@ -387,18 +387,28 @@ JNIEXPORT jbyteArray JNICALL Java_org_waal70_canbus_CanSocket__1getFilters(
 	size_t size;
 
 	// For now, maximize the limit to 5 filters...
-	size = (size_t) sizeof(struct can_filter) * 5;
+
+	//rfilter = (can_filter*) malloc(sizeof(struct can_filter) * 5);
+	//rfilter = (can_filter *) malloc(sizeof(int));
+	//filters_out = (can_filter*) malloc(sizeof(struct can_filter) * 5);
+	size = (size_t) sizeof(struct can_filter) * 4;
+	//size = sizeof(rfilter);
 	openlog("libsocket-can-java native library: ", LOG_CONS, LOG_USER);
 
-	int result = getsockopt(sock, SOL_CAN_RAW, CAN_RAW_FILTER, (char *) &rfilter, &size);
+	int result = getsockopt(sock, SOL_CAN_RAW, CAN_RAW_FILTER,  &rfilter, &size );
 	if (result == -1) {
 		return NULL;
 	}
-	filters_out = rfilter;
+
+	//memcpy(&filters_out, &rfilter, sizeof(rfilter));
+	//filters_out = rfilter;
+
+	memcpy(&filters_out, &rfilter, sizeof(rfilter));
+	//filters_out->can_id;
+    size_t size2 = size * 2;
 
 
-
-	jbyteArray data = env->NewByteArray(size);
+	jbyteArray data = env->NewByteArray(size2);
 
 		if (data == NULL) {
 				if (env->ExceptionCheck() != JNI_TRUE) {
@@ -407,9 +417,10 @@ JNIEXPORT jbyteArray JNICALL Java_org_waal70_canbus_CanSocket__1getFilters(
 				return NULL;
 			}
 
-	env->SetByteArrayRegion(data, 0, size,
-					reinterpret_cast<jbyte *>(&filters_out));
+	//env->SetByteArrayRegion(data, 0, size,
+	//reinterpret_cast<jbyte *>(&filters_out));
 
+		env->SetByteArrayRegion(data,0,size2, (jbyte *)&filters_out);
 	//delete[] filters_out;
 	std::stringstream strs;
 	strs << "About to return from getsockopt";
@@ -428,6 +439,7 @@ JNIEXPORT jint JNICALL Java_org_waal70_canbus_CanSocket__1setFilters(
 	int numfilter;
 	const char *tempString;
 	const char *tempString2;
+	const char *tempString3;
 	if (NULL == inFilterString)
 		return -1;
 
@@ -438,6 +450,7 @@ JNIEXPORT jint JNICALL Java_org_waal70_canbus_CanSocket__1setFilters(
 	numfilter = 0;
 	tempString = inFilterString;
 	tempString2 = inFilterString;
+	tempString3 = inFilterString;
 	while (tempString) {
 		numfilter++;
 		tempString++; /* hop behind the ',' */
@@ -450,31 +463,32 @@ JNIEXPORT jint JNICALL Java_org_waal70_canbus_CanSocket__1setFilters(
 
 	//Expect a filter definition in the following form (HEX!):
 	//"12345678:DFFFFFFF"
-	//TODO: Accept object and or string from JAVA and process here
 
-	//TODO: Accept more than one filter
 
 	//rfilter = (can_filter*) malloc(4);
-	rfilter = (can_filter*) malloc(sizeof(struct can_filter) * numfilter);
+	rfilter = (can_filter*) malloc(sizeof(struct can_filter) * numfilter * 2);
 	numfilter = 0;
 	while (inFilterString) {
-		tempString = inFilterString + 1; /* hop behind the ',' */
-		inFilterString = strchr(tempString, ','); /* update exit condition */
-		if (sscanf(tempString, "%x:%x", &rfilter[0].can_id,
-				&rfilter[0].can_mask) == 2) {
-			rfilter[0].can_mask &= ~CAN_ERR_FLAG;
-			rfilter[0].can_id |= CAN_EFF_FLAG;
+		//tempString = inFilterString;
+		inFilterString++;
+		 /* hop behind the ',' */
+		inFilterString = strchr(tempString2, ','); /* update exit condition */
+		if (sscanf(tempString2, "%x:%x", &rfilter[numfilter].can_id,
+				&rfilter[numfilter].can_mask) == 2) {
+			rfilter[numfilter].can_mask &= ~CAN_ERR_FLAG;
+			rfilter[numfilter].can_id |= CAN_EFF_FLAG;
 			numfilter++;
 		}
+
 	}
 	openlog("libsocket-can-java native library: ", LOG_CONS, LOG_USER);
 
 	//void* rawData = env->GetDirectBufferAddress(data);
 	//const int opt = 1;
 	int result = setsockopt(sock, SOL_CAN_RAW, CAN_RAW_FILTER, rfilter,
-			sizeof(struct can_filter) * numfilter);
+			sizeof(struct can_filter) * numfilter * 2);
 	std::stringstream strs;
-	strs << tempString2;
+	strs << tempString3;
 	std::string temp_str = strs.str();
 	char* char_type = (char*) temp_str.c_str();
 	syslog(LOG_INFO, char_type);
