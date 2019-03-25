@@ -163,7 +163,6 @@ public final class CanSocket implements Closeable {
     
     {
     	String filterString = ""; //set the default to accept everything
-    	//TODO: accept the array of CanFilters, but pass it to the native
     	// method as a comma-separated String of filter definitions (canid:canmask)
     	// The native method expects a filter definition in the following form (HEX!):
     	// "12345678:DFFFFFFF"
@@ -179,13 +178,11 @@ public final class CanSocket implements Closeable {
     		if (numfilter < filtercounter)
     			filterString +=",";
     		numfilter++;
-    		
-    		
+
     		System.out.println("filterData is: " + filterString);
        		} 
    	
         	if (CanSocket._setFilters(_fd, filterString) == -1)
-        		//log.debug("Filter set error");
         		System.out.println("Filter errors");
     }
     
@@ -215,34 +212,27 @@ public final class CanSocket implements Closeable {
     	System.out.println("I have found " + numFilter + " filter(s).");
     	System.out.println("Full filter in HEX: " + CanSocket.bytesToHex(filterData));
     	
-    	byte[] canid = reverseBytes(Arrays.copyOfRange(filterData, 0, 4));
-    	byte[] mask = Arrays.copyOfRange(filterData, 4, 8);
-      	
-      	ByteBuffer bb = ByteBuffer.wrap(canid);
-      	int cannumber = bb.getInt();
-      	int CAN_EFF_MASK = 0b11111111111111111111111111111; //29 bits
-      	int CAN_MASK = 0b11011111111111111111111111111111;
-      	int can2 = cannumber & CAN_EFF_MASK;
-      	
-      	ByteBuffer bbm = ByteBuffer.wrap(mask);
-      	int intMask = bbm.getInt();
-      	intMask = ~intMask;
-      	long unsignedMask = intMask;
-      	unsignedMask = unsignedMask & 0xffffffff;
-      	//unsignedMask = ~unsignedMask;
-      	
-      	cannumber = CanSocket.bitExtract(cannumber, 29, 1);
-      	System.out.println("The 29 can2 bits are: " + can2);
-    	System.out.println("The 29 bits are: " + cannumber);
-    	System.out.println("The mask is: " + unsignedMask);
-
-    	
-    	
-    	
-    	System.out.println("canid is: " + CanSocket.bytesToHex(canid));
-    	System.out.println("mask is: " + CanSocket.bytesToHex(mask));
-    	
-    	
+    	for (int i=0;i<numFilter;i++)
+    	{
+    		int startingPos = i * 8;
+    		int endPos = i * 8 + 4;
+    		System.out.println("Looping " + i + " out of " + numFilter + ", startingPos, endPos="+startingPos +", "+ endPos);
+    		byte[] canid = reverseBytes(Arrays.copyOfRange(filterData, startingPos, startingPos + 4));
+        	byte[] mask = reverseBytes(Arrays.copyOfRange(filterData, endPos, endPos+4));
+        	ByteBuffer bb = ByteBuffer.wrap(canid);
+          	int cannumber = bb.getInt();
+          	//int CAN_EFF_MASK = 0b11111111111111111111111111111; //29 bits
+          	//int can2 = cannumber & CAN_EFF_MASK;
+          	ByteBuffer bbm = ByteBuffer.wrap(mask);
+          	int intMask = bbm.getInt();
+          	intMask = ~intMask;
+          	long unsignedMask = intMask;
+          	unsignedMask = unsignedMask & 0xffffffff;
+          	cannumber = CanSocket.bitExtract(cannumber, 29, 1);
+          	System.out.println("The 29 bits are: " + cannumber);
+        	System.out.println("The mask is: " + unsignedMask);
+    		
+    	}
     
     }
     
@@ -386,7 +376,7 @@ public final class CanSocket implements Closeable {
     	 */
     	public String getCanId_EFFHex() {
 
-    		return String.format("%08X", _getCANID_EFF(_canId));
+    		return String.format("0x%08X", _getCANID_EFF(_canId));
 
     	}
     	public int getCanId_SFF() {
@@ -482,7 +472,7 @@ public final class CanSocket implements Closeable {
         /**
          * This filter mask can be used to match a CAN ID exactly.
          */
-        public static final int EXACT = 0xAFFAFFFF;
+        public static final int EXACT = 0xDFFFFFFF;
         public static final int ALL = 0x0;
 
         private CanId id;
@@ -550,7 +540,7 @@ public final class CanSocket implements Closeable {
          * @return the mask
          */
         public String getMaskHex() {
-            return String.format("%08X", mask);
+            return String.format("0x%08X", mask);
         }
         
         public long getMask() {

@@ -40,7 +40,7 @@ CXXFLAGS=-I./include -O2 -g -pipe -Wall -Wp,-D_FORTIFY_SOURCE=2 -fexceptions \
 $(JAVA_INCLUDES)
 SONAME=jni_socketcan
 LDFLAGS=-Wl,-soname,$(SONAME)
-REMOTE=192.168.29.250#169.254.23.187#
+REMOTE=169.254.23.187#192.168.29.250#
 REMOTEDIR=/home/awaal/libsocket-can-java
 LOCALINCLUDE=../VolvoCANBUS/src/main/resources/lib
 

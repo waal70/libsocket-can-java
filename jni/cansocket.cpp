@@ -10,6 +10,10 @@
 #include<sstream>
 #include<string.h>
 
+#include <vector>
+#include <climits>
+#include <memory>
+
 extern "C" {
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -28,6 +32,8 @@ extern "C" {
 //#endif
 
 static const int ERRNO_BUFFER_LEN = 1024;
+
+typedef unsigned char BYTE;
 
 static void throwException(JNIEnv *env, const std::string& exception_name,
 		const std::string& msg) {
@@ -377,38 +383,54 @@ JNIEXPORT jint JNICALL Java_org_waal70_canbus_CanSocket__1clearERR(JNIEnv *env,
 	return canid & ~CAN_ERR_FLAG;
 }
 
+size_t getCopySize(size_t sourceSize, size_t destSize)
+{
+    return (destSize <= sourceSize ? destSize : sourceSize);
+}
+
+void logthis(std::string msg)
+{
+	openlog("libsocket-can-java native library ", LOG_CONS, LOG_USER);
+	std::stringstream strs;
+	strs << msg;
+	std::string temp_str = strs.str();
+	char* char_type = (char*) temp_str.c_str();
+	syslog(LOG_INFO, char_type);
+
+}
+
 JNIEXPORT jbyteArray JNICALL Java_org_waal70_canbus_CanSocket__1getFilters(
 		JNIEnv *env, jclass obj, jint sock) {
-	// assign the signed integer max value to an unsigned integer, socketcan's getsockopt implementation uses int's
-	// instead of uint's and resets the size to the actual size only if the given size is larger.
-	struct can_filter *rfilter;
-	struct can_filter *filters_out;
-	//socklen_t size;
-	size_t size;
 
-	// For now, maximize the limit to 5 filters...
+	std::string s; //for logging purposes
 
-	//rfilter = (can_filter*) malloc(sizeof(struct can_filter) * 5);
-	//rfilter = (can_filter *) malloc(sizeof(int));
-	//filters_out = (can_filter*) malloc(sizeof(struct can_filter) * 5);
-	size = (size_t) sizeof(struct can_filter) * 4;
-	//size = sizeof(rfilter);
-	openlog("libsocket-can-java native library: ", LOG_CONS, LOG_USER);
+	socklen_t size = (socklen_t) (sizeof(int) * 4); //Errrm...this is 4 bytes.
 
-	int result = getsockopt(sock, SOL_CAN_RAW, CAN_RAW_FILTER,  &rfilter, &size );
+	std::unique_ptr<char[]> rfilter(new char [16]);
+	std::unique_ptr<char[]> filters_out(new char [16]);
+
+	logthis(s.append("Before getsockopt"));
+	s = "";
+
+	logthis(s.append("socklen_t size: ").append(std::to_string(size)));
+	s="";
+
+	logthis(s.append("rfilter size (bytes): ").append(std::to_string(sizeof(rfilter))));
+		s = "";
+
+	int result = getsockopt(sock, SOL_CAN_RAW, CAN_RAW_FILTER,  rfilter.get(), &size );
 	if (result == -1) {
 		return NULL;
 	}
+	logthis("After getsockopt");
+	s="";
+	logthis(s.append("struct size (bytes): ").append(std::to_string(sizeof(struct can_filter))));
+	s="";
 
-	//memcpy(&filters_out, &rfilter, sizeof(rfilter));
-	//filters_out = rfilter;
-
-	memcpy(&filters_out, &rfilter, sizeof(rfilter));
-	//filters_out->can_id;
-    size_t size2 = size * 2;
+	memcpy(filters_out.get(), rfilter.get(), 16);
 
 
-	jbyteArray data = env->NewByteArray(size2);
+	jbyteArray data = env->NewByteArray(16);
 
 		if (data == NULL) {
 				if (env->ExceptionCheck() != JNI_TRUE) {
@@ -417,80 +439,79 @@ JNIEXPORT jbyteArray JNICALL Java_org_waal70_canbus_CanSocket__1getFilters(
 				return NULL;
 			}
 
-	//env->SetByteArrayRegion(data, 0, size,
-	//reinterpret_cast<jbyte *>(&filters_out));
 
-		env->SetByteArrayRegion(data,0,size2, (jbyte *)&filters_out);
-	//delete[] filters_out;
-	std::stringstream strs;
-	strs << "About to return from getsockopt";
-	std::string temp_str = strs.str();
-	char* char_type = (char*) temp_str.c_str();
-	syslog(LOG_INFO, char_type);
+		env->SetByteArrayRegion(data, 0, 16, (jbyte *)filters_out.get());
 
 	return data;
 }
+
 
 JNIEXPORT jint JNICALL Java_org_waal70_canbus_CanSocket__1setFilters(
 		JNIEnv *env, jclass obj, jint sock, jstring data) {
 
 	// First, let's convert the jstring to a proper C++-string:
+	std::string s; //for logging purposes
 	const char *inFilterString = env->GetStringUTFChars(data, NULL);
 	int numfilter;
 	const char *tempString;
-	const char *tempString2;
-	const char *tempString3;
 	if (NULL == inFilterString)
 		return -1;
-
-	struct can_filter *rfilter;
-
+	logthis("===== BEGIN setsockopt");
 	//Counting the commas will give us the number of filter definitions
 	// as one filter def has one comma.
 	numfilter = 0;
 	tempString = inFilterString;
-	tempString2 = inFilterString;
-	tempString3 = inFilterString;
 	while (tempString) {
 		numfilter++;
 		tempString++; /* hop behind the ',' */
 		tempString = strchr(tempString, ','); /* fails if no more commas are found */
 	}
+
 	//Now, numfilter contains the number of filters :) Should that be 0, then do an erase
 	// of the filters:
 	if (numfilter == 0)
 		return setsockopt(sock, SOL_CAN_RAW, CAN_RAW_FILTER, NULL, 0);
 
+	struct can_filter rfilter[numfilter];
+	//TODO: prevent VLA:
+	//attempt 1: struct can_filter *rfilter = new can_filter[numfilter];
+	//attempt 2 std::vector<can_filter> rfilter;
+
+	//socklen_t size = sizeof(struct can_filter) * numfilter;
+
 	//Expect a filter definition in the following form (HEX!):
 	//"12345678:DFFFFFFF"
 
+	tempString = inFilterString;
+	logthis(s.append("Full filter string (setsockopt): ").append(tempString));
+	s="";
 
-	//rfilter = (can_filter*) malloc(4);
-	rfilter = (can_filter*) malloc(sizeof(struct can_filter) * numfilter * 2);
-	numfilter = 0;
-	while (inFilterString) {
-		//tempString = inFilterString;
-		inFilterString++;
-		 /* hop behind the ',' */
-		inFilterString = strchr(tempString2, ','); /* update exit condition */
-		if (sscanf(tempString2, "%x:%x", &rfilter[numfilter].can_id,
-				&rfilter[numfilter].can_mask) == 2) {
-			rfilter[numfilter].can_mask &= ~CAN_ERR_FLAG;
-			rfilter[numfilter].can_id |= CAN_EFF_FLAG;
-			numfilter++;
-		}
+	for (int i=0; i<numfilter; i++)
+	{
+		if (i != 0)
+				tempString = inFilterString +1; //only hop after the comma on filters after the first;
+		inFilterString = strchr(tempString, ',');
+		canid_t canid;
+		canid_t mask;
+		sscanf(tempString, "%x:%x", &canid, &mask);
+		rfilter[i].can_id=canid | CAN_EFF_FLAG;
+		rfilter[i].can_mask=mask | (CAN_EFF_FLAG | CAN_RTR_FLAG | CAN_SFF_MASK);
+		//currentfilter.can_id=canid | CAN_EFF_FLAG;
+		//currentfilter.can_mask = mask | (CAN_EFF_FLAG | CAN_RTR_FLAG | CAN_SFF_MASK);
+		//rfilter.push_back(currentfilter);
+		logthis(s.append("setsockopt filter canid[").append(std::to_string(i)).append("]:").append(std::to_string(rfilter[i].can_id)));
+		s="";
+		logthis(s.append("setsockopt filter mask[").append(std::to_string(i)).append("]:").append(std::to_string(rfilter[i].can_mask)));
+		s="";
 
+		if (inFilterString == NULL)
+			logthis("NULL");
 	}
-	openlog("libsocket-can-java native library: ", LOG_CONS, LOG_USER);
 
-	//void* rawData = env->GetDirectBufferAddress(data);
-	//const int opt = 1;
-	int result = setsockopt(sock, SOL_CAN_RAW, CAN_RAW_FILTER, rfilter,
-			sizeof(struct can_filter) * numfilter * 2);
-	std::stringstream strs;
-	strs << tempString3;
-	std::string temp_str = strs.str();
-	char* char_type = (char*) temp_str.c_str();
-	syslog(LOG_INFO, char_type);
+	int result = setsockopt(sock, SOL_CAN_RAW, CAN_RAW_FILTER, &rfilter,
+			sizeof(rfilter));
+	logthis(s.append("rfilter size after setsockopt: ").append(std::to_string(sizeof(rfilter))));
+		s="";
+
 	return result;
 }
