@@ -173,7 +173,7 @@ public final class CanSocket implements Closeable {
 		String filterString = ""; // set the default to accept everything
 		// method as a comma-separated String of filter definitions (canid:canmask)
 		// The native method expects a filter definition in the following form (HEX!):
-		// "12345678:DFFFFFFF"
+		// "0x12345678:0xDFFFFFFF"
 		// First, let's reset the filters:
 		int numfilter = 0;
 		int filtercounter = data.length - 1;
@@ -219,8 +219,8 @@ public final class CanSocket implements Closeable {
 		for (int i = 0; i < numFilter; i++) {
 			int startingPos = i * 8;
 			int endPos = i * 8 + 4;
-			System.out.println(
-					"Looping " + i + " out of " + numFilter + ", startingPos, endPos=" + startingPos + ", " + endPos);
+			System.out.println("Looping " + i + 1 + " out of " + numFilter + ", startingPos, endPos=" + startingPos
+					+ ", " + endPos);
 			byte[] canid = reverseBytes(Arrays.copyOfRange(filterData, startingPos, startingPos + 4));
 			byte[] mask = reverseBytes(Arrays.copyOfRange(filterData, endPos, endPos + 4));
 			ByteBuffer bb = ByteBuffer.wrap(canid);
