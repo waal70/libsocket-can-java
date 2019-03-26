@@ -471,8 +471,9 @@ JNIEXPORT jint JNICALL Java_org_waal70_canbus_CanSocket__1setFilters(
 	// Counting the commas will give us the number of filter definitions
 	// as one filter def has one comma.
 	tempString = inFilterString;
+	std::string noFilter = "0x00000000:0x00000000";
 	while (tempString) {
-		if (strlen(inFilterString) != 0)
+		if ((strlen(inFilterString) != 0) && (inFilterString != noFilter))
 			numfilter++;
 		tempString++; /* hop behind the ',' */
 		tempString = strchr(tempString, ','); /* fails if no more commas are found */

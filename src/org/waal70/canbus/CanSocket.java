@@ -177,7 +177,7 @@ public final class CanSocket implements Closeable {
 		// First, let's reset the filters:
 		int numfilter = 0;
 		int filtercounter = data.length - 1;
-		if (CanSocket._setFilters(_fd, filterString) == -1)
+		if (CanSocket._setFilters(_fd, "0x00000000:0x00000000") == -1)
 			System.out.println("Unable to reset filter");
 		for (CanFilter f : data) {
 			filterString += f.getIdHex() + ":" + f.getMaskHex();
