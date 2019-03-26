@@ -489,6 +489,10 @@ JNIEXPORT jint JNICALL Java_org_waal70_canbus_CanSocket__1setFilters(
 
 	//TODO: This is a VLA, which is not allowed. So, find a way to prevent VLA:
 	struct can_filter rfilter[numfilter];
+	//attempt 1:
+	//typedef can_filter cft;
+	//std::vector<cft> rfilter(numfilter);
+
 
 	// The filter definitions are in the following form: (HEX!):
 	//"0x12345678:0xDFFFFFFF"
@@ -497,13 +501,18 @@ JNIEXPORT jint JNICALL Java_org_waal70_canbus_CanSocket__1setFilters(
 	logthis(s.append("Full filter string (setsockopt): ").append(tempString));
 	s = "";
 
+
 	for (int i = 0; i < numfilter; i++) {
+		//cft currentfilter;
 		if (i != 0)
 			tempString = inFilterString + 1; //only hop after the comma on filters after the first;
 		inFilterString = strchr(tempString, ',');
 		sscanf(tempString, "%x:%x", &rfilter[i].can_id, &rfilter[i].can_mask);
 		rfilter[i].can_id |=  CAN_EFF_FLAG;
+		//currentfilter.can_id |=  CAN_EFF_FLAG;
 		rfilter[i].can_mask |= (CAN_EFF_FLAG | CAN_RTR_FLAG | CAN_SFF_MASK); // I want it all...
+		//currentfilter.can_mask |= (CAN_EFF_FLAG | CAN_RTR_FLAG | CAN_SFF_MASK); // I want it all...
+		//rfilter.push_back(currentfilter);
 		logthis(
 				s.append("setsockopt filter canid[").append(std::to_string(i)).append(
 						"]:").append(std::to_string(rfilter[i].can_id)));
