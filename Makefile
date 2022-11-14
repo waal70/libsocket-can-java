@@ -19,7 +19,7 @@ endif
 JAVA_INCLUDES=-I$(JAVA_HOME)/include/linux -I$(JAVA_HOME)/include
 JAVA=$(JAVA_HOME)/bin/java
 JAVAC=$(JAVA_HOME)/bin/javac
-JAVAH=$(JAVA_HOME)/bin/javah
+JAVAH=$(JAVA_HOME)/bin/javac
 JAR=$(JAVA_HOME)/bin/jar
 JAVA_SRC:=$(shell find src -type f -and -name '*.java')
 JAVA_TEST_SRC:=$(shell find src.test -type f -and -name '*.java')
@@ -32,7 +32,7 @@ JAR_DEST_FILE=$(JAR_DEST)/$(NAME).jar
 JAR_MANIFEST_FILE=META-INF/MANIFEST.MF
 DIRS=stamps obj $(JAVA_DEST) $(JAVA_TEST_DEST) $(LIB_DEST) $(JAR_DEST)
 JNI_DIR=jni
-JNI_CLASSES=org.waal70.canbus.CanSocket
+JNI_CLASSES=src/org/waal70/canbus/CanSocket.java
 JAVAC_FLAGS=-g -Xlint:all
 CXXFLAGS=-I./include -O2 -g -pipe -Wall -Wp,-D_FORTIFY_SOURCE=2 -fexceptions \
 -fstack-protector --param=ssp-buffer-size=4 -fPIC -Wno-unused-parameter \
@@ -71,7 +71,9 @@ stamps/compile-test: stamps/compile-src $(JAVA_TEST_SRC)
 		@touch $@
 
 stamps/generate-jni-h: stamps/compile-src
-		$(JAVAH) -jni -d $(JNI_DIR) -classpath $(JAVA_DEST) \
+		##Dirty hack. JAVAH is deprecated, is now javac -h
+		##Commands are different, changed it to the following:
+		$(JAVAH) -h jni -classpath $(JAVA_DEST) \
                 $(JNI_CLASSES)
 		@touch $@
 

@@ -25,22 +25,17 @@ import java.util.Set;
 public final class CanSocket implements Closeable {
 	// private static Logger log = Logger.getLogger(CanSocket.class);
 	static {
-		// log.debug("Trying to load native library");
-		final String LIB_JNI_SOCKETCAN = "jni_socketcan";
-		try {
-			// log.debug("Try loadLibrary");
-			System.loadLibrary(LIB_JNI_SOCKETCAN);
-		} catch (final UnsatisfiedLinkError e) {
-			try {
-				// log.debug("Try load from JAR");
-				loadLibFromJar(LIB_JNI_SOCKETCAN);
-			} catch (final IOException _e) {
-				// log.error("Cannot load native library");
-				throw new UnsatisfiedLinkError(LIB_JNI_SOCKETCAN);
-			}
-		}
-		// log.debug("Succesfully loaded native library");
-	}
+        final String LIB_JNI_SOCKETCAN = "jni_socketcan";
+        try {
+            System.loadLibrary(LIB_JNI_SOCKETCAN);
+        } catch (final UnsatisfiedLinkError e) {
+            try {
+                loadLibFromJar(LIB_JNI_SOCKETCAN);
+            } catch (final IOException _e) {
+                throw new UnsatisfiedLinkError(LIB_JNI_SOCKETCAN);
+            }
+        }
+    }
 
 	private static void copyStream(final InputStream in, final OutputStream out) throws IOException {
 		final int BYTE_BUFFER_SIZE = 0x1000;
